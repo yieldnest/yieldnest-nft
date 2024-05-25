@@ -1,6 +1,7 @@
 # Compiler files
 cache/
 out/
+bin/
 
 # Ignores development broadcast logs
 !/broadcast
@@ -12,3 +13,9 @@ docs/
 
 # Dotenv file
 .env
+
+# Mac
+.DS_STORE
+
+# VS Code
+.vscode/
