@@ -17,13 +17,35 @@ contract YieldNestNFT is
 {
     using Strings for uint8;
 
+    //--------------------------------------------------------------------------------------
+    //--------------------------------------  ROLES  ---------------------------------------
+    //--------------------------------------------------------------------------------------
+
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    string private constant SIGNING_DOMAIN = "Voucher-Domain";
-    string private constant SIGNATURE_VERSION = "1";
-    uint256 private _nextTokenId;
-    string private _baseTokenURI;
+
+    //--------------------------------------------------------------------------------------
+    //------------------------------------  CONSTANTS  -------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    string public constant SIGNING_DOMAIN = "Voucher-Domain";
+    string public constant SIGNATURE_VERSION = "1";
+
+    //--------------------------------------------------------------------------------------
+    //------------------------------------  VARIABLES  -------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    uint256 public nextTokenId;
+    string public baseTokenURI;
+
+    //--------------------------------------------------------------------------------------
+    //-------------------------------------  MAPPINGS  -------------------------------------
+    //--------------------------------------------------------------------------------------
 
     mapping(uint256 => uint8) public stages;
+
+    //--------------------------------------------------------------------------------------
+    //----------------------------------  INITIALIZATION  ----------------------------------
+    //--------------------------------------------------------------------------------------
 
     constructor() {
         _disableInitializers();
@@ -34,7 +56,7 @@ contract YieldNestNFT is
         address minter,
         string memory tokenName,
         string memory tokenSymbol,
-        string memory baseTokenURI
+        string memory _baseTokenURI
     ) public initializer {
         __ERC721_init(tokenName, tokenSymbol);
         __EIP712_init(SIGNING_DOMAIN, SIGNATURE_VERSION);
@@ -43,8 +65,54 @@ contract YieldNestNFT is
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(MINTER_ROLE, minter);
 
-        _baseTokenURI = baseTokenURI;
+        baseTokenURI = _baseTokenURI;
     }
+
+    //--------------------------------------------------------------------------------------
+    //-----------------------------------  MINTING  ----------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    function safeMint(address to) public onlyRole(MINTER_ROLE) {
+        _safeMint(to, ++nextTokenId);
+
+        emit Minted(to, nextTokenId);
+    }
+
+    function safeMint(MintVoucher memory voucher, bytes calldata signature) public {
+        if (!hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature))) revert InvalidSignature();
+        if (block.timestamp > voucher.expiresAt) revert ExpiredVoucher();
+
+        _safeMint(voucher.recipient, ++nextTokenId);
+
+        emit Minted(voucher.recipient, nextTokenId);
+    }
+
+    //--------------------------------------------------------------------------------------
+    //-----------------------------------  UPGRADING  --------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    function safeUpgrade(UpgradeVoucher memory voucher, bytes calldata signature) public {
+        _requireOwned(voucher.tokenId);
+        if (!hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher, signature))) revert InvalidSignature();
+        if (block.timestamp > voucher.expiresAt) revert ExpiredVoucher();
+        if (stages[voucher.tokenId] >= voucher.stage) revert InvalidStage();
+
+        stages[voucher.tokenId] = voucher.stage;
+
+        emit Upgraded(voucher.tokenId, voucher.stage);
+    }
+
+    //--------------------------------------------------------------------------------------
+    //-------------------------------------  ADMIN  ----------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    function setBaseURI(string memory _baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        baseTokenURI = _baseTokenURI;
+    }
+
+    //--------------------------------------------------------------------------------------
+    //------------------------------- SIGNATURE VERIFICATION -------------------------------
+    //--------------------------------------------------------------------------------------
 
     function recoverMintVoucher(MintVoucher memory voucher, bytes calldata signature) public view returns (address) {
         bytes32 digest = _hashTypedDataV4(
@@ -77,34 +145,12 @@ contract YieldNestNFT is
         return signer;
     }
 
-    function safeMint(address to) public onlyRole(MINTER_ROLE) {
-        _safeMint(to, ++_nextTokenId);
-
-        emit Minted(to, _nextTokenId);
-    }
-
-    function safeMint(MintVoucher memory voucher, bytes calldata signature) public {
-        require(hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature)), "Wrong signature");
-        require(block.timestamp <= voucher.expiresAt, "Signature has expired");
-
-        _safeMint(voucher.recipient, ++_nextTokenId);
-
-        emit Minted(voucher.recipient, _nextTokenId);
-    }
-
-    function safeUpgrade(UpgradeVoucher memory voucher, bytes calldata signature) public {
-        _requireOwned(voucher.tokenId);
-        require(hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher, signature)), "Wrong signature");
-        require(block.timestamp <= voucher.expiresAt, "Signature has expired");
-        require(stages[voucher.tokenId] < voucher.stage, "Invalid stage");
-
-        stages[voucher.tokenId] = voucher.stage;
-
-        emit Upgraded(voucher.tokenId, voucher.stage);
-    }
+    //--------------------------------------------------------------------------------------
+    //-------------------------------------  VIEWS  ----------------------------------------
+    //--------------------------------------------------------------------------------------
 
     function _baseURI() internal view override returns (string memory) {
-        return _baseTokenURI;
+        return baseTokenURI;
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
