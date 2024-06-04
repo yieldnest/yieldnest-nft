@@ -2,8 +2,24 @@
 pragma solidity ^0.8.24;
 
 interface IYieldNestNFT {
+    //--------------------------------------------------------------------------------------
+    //----------------------------------  EVENTS  ------------------------------------------
+    //--------------------------------------------------------------------------------------
+
     event Minted(address indexed recipient, uint256 indexed tokenId);
     event Upgraded(uint256 indexed tokenId, uint8 indexed stage);
+
+    //--------------------------------------------------------------------------------------
+    //----------------------------------  ERRORS  ------------------------------------------
+    //--------------------------------------------------------------------------------------
+
+    error InvalidSignature();
+    error ExpiredVoucher();
+    error InvalidStage();
+
+    //--------------------------------------------------------------------------------------
+    //--------------------------------  STRUCTURES  ----------------------------------------
+    //--------------------------------------------------------------------------------------
 
     struct MintVoucher {
         address recipient;
@@ -15,6 +31,10 @@ interface IYieldNestNFT {
         uint8 stage;
         uint256 expiresAt;
     }
+
+    //--------------------------------------------------------------------------------------
+    //--------------------------------  FUNCTIONS  -----------------------------------------
+    //--------------------------------------------------------------------------------------
 
     /**
      * @notice Initialize the contract
@@ -64,4 +84,10 @@ interface IYieldNestNFT {
      * @param voucher The upgrade voucher
      */
     function safeUpgrade(UpgradeVoucher memory voucher, bytes calldata signature) external;
+
+    /**
+     * @notice set the base URI
+     * @param baseURI The base URI
+     */
+    function setBaseURI(string memory baseURI) external;
 }
