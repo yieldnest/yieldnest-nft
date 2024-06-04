@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {IYieldNestNFT} from "../../src/interfaces/IYieldNestNFT.sol";
 
 contract SigUtils {
-    /// @notice The ERC-20 token domain separator
     bytes32 internal immutable DOMAIN_SEPARATOR;
 
     constructor(bytes32 _DOMAIN_SEPARATOR) {
