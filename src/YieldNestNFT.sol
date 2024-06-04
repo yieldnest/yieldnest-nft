@@ -6,8 +6,15 @@ import {ERC721Upgradeable, Strings} from "@openzeppelin-upgradeable/contracts/to
 import {AccessControlUpgradeable} from "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IYieldNestNFT} from "./interfaces/IYieldNestNFT.sol";
 
-contract YieldNestNFT is Initializable, ERC721Upgradeable, AccessControlUpgradeable, EIP712Upgradeable {
+contract YieldNestNFT is
+    IYieldNestNFT,
+    Initializable,
+    ERC721Upgradeable,
+    AccessControlUpgradeable,
+    EIP712Upgradeable
+{
     using Strings for uint8;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -17,20 +24,6 @@ contract YieldNestNFT is Initializable, ERC721Upgradeable, AccessControlUpgradea
     string private _baseTokenURI;
 
     mapping(uint256 => uint8) public stages;
-
-    struct MintVoucher {
-        address receipient;
-        uint256 expiresAt;
-        bytes signature;
-    }
-
-    struct UpgradeVoucher {
-        uint256 tokenId;
-        uint8 stage;
-        address receipient;
-        uint256 expiresAt;
-        bytes signature;
-    }
 
     constructor() {
         _disableInitializers();
@@ -53,66 +46,61 @@ contract YieldNestNFT is Initializable, ERC721Upgradeable, AccessControlUpgradea
         _baseTokenURI = baseTokenURI;
     }
 
-    function setMintFactory(address factory) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(!hasRole(MINTER_ROLE, factory), "Already has role");
-        _grantRole(MINTER_ROLE, factory);
-    }
-
-    function removeMintFactory(address factory) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(hasRole(MINTER_ROLE, factory), "This is not a minter factory");
-        _revokeRole(MINTER_ROLE, factory);
-    }
-
-    function recoverMintVoucher(MintVoucher memory voucher) public view returns (address) {
+    function recoverMintVoucher(MintVoucher memory voucher, bytes calldata signature) public view returns (address) {
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    keccak256("MintVoucher(address receipient,uint256 expiresAt)"),
-                    voucher.receipient,
-                    voucher.expiresAt
+                    keccak256("MintVoucher(address recipient,uint256 expiresAt)"), voucher.recipient, voucher.expiresAt
                 )
             )
         );
-        address signer = ECDSA.recover(digest, voucher.signature);
+        address signer = ECDSA.recover(digest, signature);
         return signer;
     }
 
-    function recoverUpgradeVoucher(UpgradeVoucher memory voucher) public view returns (address) {
+    function recoverUpgradeVoucher(UpgradeVoucher memory voucher, bytes calldata signature)
+        public
+        view
+        returns (address)
+    {
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,address receipient,uint256 expiresAt)"),
+                    keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,uint256 expiresAt)"),
                     voucher.tokenId,
                     voucher.stage,
-                    voucher.receipient,
                     voucher.expiresAt
                 )
             )
         );
-        address signer = ECDSA.recover(digest, voucher.signature);
+        address signer = ECDSA.recover(digest, signature);
         return signer;
     }
 
     function safeMint(address to) public onlyRole(MINTER_ROLE) {
         _safeMint(to, ++_nextTokenId);
+
+        emit Minted(to, _nextTokenId);
     }
 
-    function safeMint(address receipient, uint256 expiresAt, bytes calldata signature) public payable {
-        MintVoucher memory voucher = MintVoucher(receipient, expiresAt, signature);
-        require(hasRole(MINTER_ROLE, recoverMintVoucher(voucher)), "Wrong signature");
+    function safeMint(MintVoucher memory voucher, bytes calldata signature) public {
+        require(hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature)), "Wrong signature");
         require(block.timestamp <= voucher.expiresAt, "Signature has expired");
-        _safeMint(voucher.receipient, ++_nextTokenId);
+
+        _safeMint(voucher.recipient, ++_nextTokenId);
+
+        emit Minted(voucher.recipient, _nextTokenId);
     }
 
-    function safeUpgrade(uint256 tokenId, uint8 stage, address receipient, uint256 expiresAt, bytes calldata signature)
-        public
-        payable
-    {
-        UpgradeVoucher memory voucher = UpgradeVoucher(tokenId, stage, receipient, expiresAt, signature);
-        require(hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher)), "Wrong signature");
+    function safeUpgrade(UpgradeVoucher memory voucher, bytes calldata signature) public {
+        _requireOwned(voucher.tokenId);
+        require(hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher, signature)), "Wrong signature");
         require(block.timestamp <= voucher.expiresAt, "Signature has expired");
-        require(stages[tokenId] < voucher.stage, "Invalid stage");
-        stages[tokenId] = voucher.stage;
+        require(stages[voucher.tokenId] < voucher.stage, "Invalid stage");
+
+        stages[voucher.tokenId] = voucher.stage;
+
+        emit Upgraded(voucher.tokenId, voucher.stage);
     }
 
     function _baseURI() internal view override returns (string memory) {
