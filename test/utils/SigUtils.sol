@@ -13,7 +13,10 @@ contract SigUtils {
     function getStructHash(IYieldNestNFT.MintVoucher memory voucher) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                keccak256("MintVoucher(address recipient,uint256 expiresAt)"), voucher.recipient, voucher.expiresAt
+                keccak256("MintVoucher(address recipient,uint256 recipientNonce,uint256 expiresAt)"),
+                voucher.recipient,
+                voucher.recipientNonce,
+                voucher.expiresAt
             )
         );
     }
@@ -25,9 +28,10 @@ contract SigUtils {
     function getStructHash(IYieldNestNFT.UpgradeVoucher memory voucher) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,uint256 expiresAt)"),
+                keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,uint256 avatar,uint256 expiresAt)"),
                 voucher.tokenId,
                 voucher.stage,
+                voucher.avatar,
                 voucher.expiresAt
             )
         );

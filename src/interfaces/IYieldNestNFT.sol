@@ -16,6 +16,8 @@ interface IYieldNestNFT {
     error InvalidSignature();
     error ExpiredVoucher();
     error InvalidStage();
+    error InvalidNonce();
+    error Unauthorized();
 
     //--------------------------------------------------------------------------------------
     //--------------------------------  STRUCTURES  ----------------------------------------
@@ -23,12 +25,14 @@ interface IYieldNestNFT {
 
     struct MintVoucher {
         address recipient;
+        uint256 recipientNonce;
         uint256 expiresAt;
     }
 
     struct UpgradeVoucher {
         uint256 tokenId;
         uint8 stage;
+        uint256 avatar;
         uint256 expiresAt;
     }
 
@@ -55,12 +59,14 @@ interface IYieldNestNFT {
     /**
      * @notice recover the signer of a mint voucher
      * @param voucher The mint voucher
+     * @return The signer of the voucher
      */
     function recoverMintVoucher(MintVoucher memory voucher, bytes calldata signature) external view returns (address);
 
     /**
      * @notice recover the signer of an upgrade voucher
      * @param voucher The upgrade voucher
+     * @return The signer of the voucher
      */
     function recoverUpgradeVoucher(UpgradeVoucher memory voucher, bytes calldata signature)
         external

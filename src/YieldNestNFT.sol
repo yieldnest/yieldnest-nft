@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/Ini
 import {ERC721Upgradeable, Strings} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol";
+import {NoncesUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/NoncesUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IYieldNestNFT} from "./interfaces/IYieldNestNFT.sol";
 
@@ -13,9 +14,11 @@ contract YieldNestNFT is
     Initializable,
     ERC721Upgradeable,
     AccessControlUpgradeable,
-    EIP712Upgradeable
+    EIP712Upgradeable,
+    NoncesUpgradeable
 {
     using Strings for uint8;
+    using Strings for uint256;
 
     //--------------------------------------------------------------------------------------
     //--------------------------------------  ROLES  ---------------------------------------
@@ -42,6 +45,7 @@ contract YieldNestNFT is
     //--------------------------------------------------------------------------------------
 
     mapping(uint256 => uint8) public stages;
+    mapping(uint256 => uint256) public avatars;
 
     //--------------------------------------------------------------------------------------
     //----------------------------------  INITIALIZATION  ----------------------------------
@@ -61,6 +65,7 @@ contract YieldNestNFT is
         __ERC721_init(tokenName, tokenSymbol);
         __EIP712_init(SIGNING_DOMAIN, SIGNATURE_VERSION);
         __AccessControl_init();
+        __Nonces_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(MINTER_ROLE, minter);
@@ -80,6 +85,7 @@ contract YieldNestNFT is
 
     function safeMint(MintVoucher memory voucher, bytes calldata signature) public {
         if (!hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature))) revert InvalidSignature();
+        if (voucher.recipientNonce != _useNonce(voucher.recipient)) revert InvalidNonce();
         if (block.timestamp > voucher.expiresAt) revert ExpiredVoucher();
 
         _safeMint(voucher.recipient, ++nextTokenId);
@@ -98,6 +104,7 @@ contract YieldNestNFT is
         if (stages[voucher.tokenId] >= voucher.stage) revert InvalidStage();
 
         stages[voucher.tokenId] = voucher.stage;
+        avatars[voucher.tokenId] = voucher.avatar;
 
         emit Upgraded(voucher.tokenId, voucher.stage);
     }
@@ -118,7 +125,10 @@ contract YieldNestNFT is
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    keccak256("MintVoucher(address recipient,uint256 expiresAt)"), voucher.recipient, voucher.expiresAt
+                    keccak256("MintVoucher(address recipient,uint256 recipientNonce,uint256 expiresAt)"),
+                    voucher.recipient,
+                    voucher.recipientNonce,
+                    voucher.expiresAt
                 )
             )
         );
@@ -134,9 +144,10 @@ contract YieldNestNFT is
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,uint256 expiresAt)"),
+                    keccak256("UpgradeVoucher(uint256 tokenId,uint8 stage,uint256 avatar,uint256 expiresAt)"),
                     voucher.tokenId,
                     voucher.stage,
+                    voucher.avatar,
                     voucher.expiresAt
                 )
             )
@@ -157,7 +168,17 @@ contract YieldNestNFT is
         _requireOwned(tokenId);
 
         string memory baseURI = _baseURI();
-        return bytes(baseURI).length > 0 ? string.concat(baseURI, stages[tokenId].toString()) : "";
+        if (bytes(baseURI).length == 0) return "";
+        if (stages[tokenId] == 0) return baseURI;
+        return string.concat(baseURI, avatars[tokenId].toString(), "/", stages[tokenId].toString());
+    }
+
+    function nonces(address recipient) public view virtual override returns (uint256) {
+        return super.nonces(recipient);
+    }
+
+    function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
+        return _domainSeparatorV4();
     }
 
     // The following functions are overrides required by Solidity.

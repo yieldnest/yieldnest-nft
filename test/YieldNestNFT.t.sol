@@ -11,7 +11,6 @@ import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.s
 import {SigUtils} from "./utils/SigUtils.sol";
 
 contract YieldNestNFTTest is Test {
-    
     //--------------------------------------------------------------------------------------
     //-----------------------------------  VARIABLES  --------------------------------------
     //--------------------------------------------------------------------------------------
@@ -31,8 +30,6 @@ contract YieldNestNFTTest is Test {
     address internal admin;
     address internal minter;
     address internal bob;
-
-    bytes32 internal DOMAIN_SEPARATOR;
 
     //--------------------------------------------------------------------------------------
     //-------------------------------------  SETUP  ----------------------------------------
@@ -56,21 +53,16 @@ contract YieldNestNFTTest is Test {
         nft.initialize(admin, minter, "YieldNestNFT", "ynNFT", "ipfs://nft.yieldnest.finance/");
 
         // Setup SigUtils
-        (, string memory name, string memory version, uint256 chainId, address verifyingContract,,) = nft.eip712Domain();
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name)),
-                keccak256(bytes(version)),
-                chainId,
-                verifyingContract
-            )
-        );
-        sigUtils = new SigUtils(DOMAIN_SEPARATOR);
+        sigUtils = new SigUtils(nft.DOMAIN_SEPARATOR());
 
         // Make vouchers
-        mintVoucher = IYieldNestNFT.MintVoucher({recipient: bob, expiresAt: block.timestamp + 15 minutes});
-        upgradeVoucher = IYieldNestNFT.UpgradeVoucher({tokenId: 1, stage: 1, expiresAt: block.timestamp + 15 minutes});
+        mintVoucher = IYieldNestNFT.MintVoucher({
+            recipient: bob,
+            recipientNonce: nft.nonces(bob),
+            expiresAt: block.timestamp + 15 minutes
+        });
+        upgradeVoucher =
+            IYieldNestNFT.UpgradeVoucher({tokenId: 1, stage: 1, avatar: 1000, expiresAt: block.timestamp + 15 minutes});
 
         // Mint a token for upgrade testing
         vm.prank(minter);
@@ -82,6 +74,7 @@ contract YieldNestNFTTest is Test {
     //--------------------------------------------------------------------------------------
 
     function test_MintWithMinterRole_NotMinter() public {
+        // Calling safeMint without minter role
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), nft.MINTER_ROLE()
@@ -92,18 +85,21 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_MintWithMinterRole_Minter() public {
+        // Calling safeMint with minter role
         vm.prank(minter);
         nft.safeMint(bob);
         assertEq(nft.balanceOf(bob), 1);
     }
 
     function test_MintWithVoucher_NoSignature() public {
+        // Calling safeMint with no signature
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignatureLength.selector, 0));
         nft.safeMint(mintVoucher, new bytes(0));
         assertEq(nft.balanceOf(bob), 0);
     }
 
     function test_MintWithVoucher_InvalidSignature() public {
+        // Calling safeMint with bob's signature instead of minter's
         bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
         vm.expectRevert(IYieldNestNFT.InvalidSignature.selector);
         mintNft(mintVoucher, digest, bobPrivateKey);
@@ -111,6 +107,7 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_MintWithVoucher_ExpiredVoucher() public {
+        // Calling safeMint with an expired voucher
         mintVoucher.expiresAt = block.timestamp - 1 seconds;
         bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
         vm.expectRevert(IYieldNestNFT.ExpiredVoucher.selector);
@@ -119,12 +116,48 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_MintWithVoucher_CorrectSignature() public {
+        // Calling safeMint with the minter's signature
         bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
         mintNft(mintVoucher, digest, minterPrivateKey);
         assertEq(nft.balanceOf(bob), 1);
     }
 
+    function test_MintWithVoucher_VoucherCanOnlyBeUsedOnce() public {
+        // Calling safeMint with the same voucher twice
+        bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        assertEq(nft.balanceOf(bob), 1);
+        vm.expectRevert(IYieldNestNFT.InvalidNonce.selector);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        assertEq(nft.balanceOf(bob), 1);
+    }
+
+    function test_MintWithVoucher_SameUserCanMintMultipleTokensWithDifferentVouchers() public {
+        // Calling safeMint with different vouchers as the same user
+        uint256 firstNonce = mintVoucher.recipientNonce;
+        bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        assertEq(nft.balanceOf(bob), 1);
+        mintVoucher.recipientNonce = nft.nonces(bob);
+        uint256 secondNonce = mintVoucher.recipientNonce;
+        digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        assertEq(nft.balanceOf(bob), 2);
+        assertNotEq(firstNonce, secondNonce);
+    }
+
+    function test_MintWithVoucer_InvalidNonce() public {
+        // Calling safeMint with an invalid nonce
+        mintVoucher.recipientNonce = 1;
+        assertNotEq(mintVoucher.recipientNonce, nft.nonces(bob));
+        bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
+        vm.expectRevert(IYieldNestNFT.InvalidNonce.selector);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        assertEq(nft.balanceOf(bob), 0);
+    }
+
     function test_upgradeWithVoucher_NonexistentToken() public {
+        // Calling safeUpgrade for a tokenId that's not yet minted
         upgradeVoucher.tokenId = 2;
         bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
         vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, 2));
@@ -133,12 +166,14 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_upgradeWithVoucher_NoSignature() public {
+        // Calling safeUpgrade with no signature
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignatureLength.selector, 0));
         nft.safeUpgrade(upgradeVoucher, new bytes(0));
         assertEq(nft.stages(1), 0);
     }
 
     function test_upgradeWithVoucher_InvalidSignature() public {
+        // Calling safeUpgrade with bob's signature instead of minter's
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         vm.expectRevert(IYieldNestNFT.InvalidSignature.selector);
         upgradeNft(upgradeVoucher, digest, bobPrivateKey);
@@ -146,6 +181,7 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_upgradeWithVoucher_ExpiredVoucher() public {
+        // Calling safeUpgrade with an expired voucher
         upgradeVoucher.expiresAt = block.timestamp - 1 seconds;
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         vm.expectRevert(IYieldNestNFT.ExpiredVoucher.selector);
@@ -154,12 +190,14 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_upgradeWithVoucher_CorrectSignature() public {
+        // Calling safeUpgrade with the minter's signature
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         upgradeNft(upgradeVoucher, digest, minterPrivateKey);
         assertEq(nft.stages(1), 1);
     }
 
     function test_upgradeWithVoucher_SameStage() public {
+        // Calling safeUpgrade with the same voucher twice (same stage)
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         upgradeNft(upgradeVoucher, digest, minterPrivateKey);
         assertEq(nft.stages(1), 1);
@@ -169,6 +207,7 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_upgradeWithVoucher_IncreaseStage() public {
+        // Calling safeUpgrade with stage 1 and then stage 2
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         upgradeNft(upgradeVoucher, digest, minterPrivateKey);
         assertEq(nft.stages(1), 1);
@@ -179,6 +218,7 @@ contract YieldNestNFTTest is Test {
     }
 
     function test_upgradeWithVoucher_DecreaseStage() public {
+        // Calling safeUpgrade with stage 1 and then stage 0
         bytes32 digest = sigUtils.getTypedDataHash(upgradeVoucher);
         upgradeNft(upgradeVoucher, digest, minterPrivateKey);
         assertEq(nft.stages(1), 1);
