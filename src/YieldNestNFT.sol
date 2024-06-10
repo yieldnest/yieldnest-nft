@@ -169,7 +169,7 @@ contract YieldNestNFT is
 
         string memory baseURI = _baseURI();
         if (bytes(baseURI).length == 0) return "";
-        if (stages[tokenId] == 0) return baseURI;
+        if (stages[tokenId] == 0) return string.concat(baseURI, "/0");
         return string.concat(baseURI, avatars[tokenId].toString(), "/", stages[tokenId].toString());
     }
 
