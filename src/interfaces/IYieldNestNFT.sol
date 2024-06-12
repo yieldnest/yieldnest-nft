@@ -8,6 +8,7 @@ interface IYieldNestNFT {
 
     event Minted(address indexed recipient, uint256 indexed tokenId);
     event Upgraded(uint256 indexed tokenId, uint8 indexed stage);
+    event BaseURIChanged(string baseURI);
 
     //--------------------------------------------------------------------------------------
     //----------------------------------  ERRORS  ------------------------------------------
@@ -18,6 +19,7 @@ interface IYieldNestNFT {
     error InvalidStage();
     error InvalidNonce();
     error Unauthorized();
+    error NoChanges();
 
     //--------------------------------------------------------------------------------------
     //--------------------------------  STRUCTURES  ----------------------------------------

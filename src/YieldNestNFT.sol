@@ -58,9 +58,9 @@ contract YieldNestNFT is
     function initialize(
         address defaultAdmin,
         address minter,
-        string memory tokenName,
-        string memory tokenSymbol,
-        string memory _baseTokenURI
+        string calldata tokenName,
+        string calldata tokenSymbol,
+        string calldata _baseTokenURI
     ) public initializer {
         __ERC721_init(tokenName, tokenSymbol);
         __EIP712_init(SIGNING_DOMAIN, SIGNATURE_VERSION);
@@ -78,29 +78,31 @@ contract YieldNestNFT is
     //--------------------------------------------------------------------------------------
 
     function safeMint(address to) public onlyRole(MINTER_ROLE) {
-        _safeMint(to, ++nextTokenId);
+        uint256 tokenId = ++nextTokenId;
+        _safeMint(to, tokenId);
 
-        emit Minted(to, nextTokenId);
+        emit Minted(to, tokenId);
     }
 
-    function safeMint(MintVoucher memory voucher, bytes calldata signature) public {
+    function safeMint(MintVoucher calldata voucher, bytes calldata signature) public {
         if (!hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature))) revert InvalidSignature();
         if (voucher.recipientNonce != _useNonce(voucher.recipient)) revert InvalidNonce();
-        if (block.timestamp > voucher.expiresAt) revert ExpiredVoucher();
+        if (block.timestamp >= voucher.expiresAt) revert ExpiredVoucher();
 
-        _safeMint(voucher.recipient, ++nextTokenId);
+        uint256 tokenId = ++nextTokenId;
+        _safeMint(voucher.recipient, tokenId);
 
-        emit Minted(voucher.recipient, nextTokenId);
+        emit Minted(voucher.recipient, tokenId);
     }
 
     //--------------------------------------------------------------------------------------
     //-----------------------------------  UPGRADING  --------------------------------------
     //--------------------------------------------------------------------------------------
 
-    function safeUpgrade(UpgradeVoucher memory voucher, bytes calldata signature) public {
+    function safeUpgrade(UpgradeVoucher calldata voucher, bytes calldata signature) public {
         _requireOwned(voucher.tokenId);
         if (!hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher, signature))) revert InvalidSignature();
-        if (block.timestamp > voucher.expiresAt) revert ExpiredVoucher();
+        if (block.timestamp >= voucher.expiresAt) revert ExpiredVoucher();
         if (stages[voucher.tokenId] >= voucher.stage) revert InvalidStage();
 
         stages[voucher.tokenId] = voucher.stage;
@@ -113,15 +115,19 @@ contract YieldNestNFT is
     //-------------------------------------  ADMIN  ----------------------------------------
     //--------------------------------------------------------------------------------------
 
-    function setBaseURI(string memory _baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBaseURI(string calldata _baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (keccak256(bytes(_baseTokenURI)) == keccak256(bytes(baseTokenURI))) revert NoChanges();
+
         baseTokenURI = _baseTokenURI;
+
+        emit BaseURIChanged(_baseTokenURI);
     }
 
     //--------------------------------------------------------------------------------------
     //------------------------------- SIGNATURE VERIFICATION -------------------------------
     //--------------------------------------------------------------------------------------
 
-    function recoverMintVoucher(MintVoucher memory voucher, bytes calldata signature) public view returns (address) {
+    function recoverMintVoucher(MintVoucher calldata voucher, bytes calldata signature) public view returns (address) {
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
@@ -136,7 +142,7 @@ contract YieldNestNFT is
         return signer;
     }
 
-    function recoverUpgradeVoucher(UpgradeVoucher memory voucher, bytes calldata signature)
+    function recoverUpgradeVoucher(UpgradeVoucher calldata voucher, bytes calldata signature)
         public
         view
         returns (address)
@@ -169,7 +175,7 @@ contract YieldNestNFT is
 
         string memory baseURI = _baseURI();
         if (bytes(baseURI).length == 0) return "";
-        if (stages[tokenId] == 0) return string.concat(baseURI, "/0");
+        if (stages[tokenId] == 0) return string.concat(baseURI, "0");
         return string.concat(baseURI, avatars[tokenId].toString(), "/", stages[tokenId].toString());
     }
 
