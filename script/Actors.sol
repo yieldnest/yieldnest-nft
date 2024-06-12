@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD 3-Clause License
 pragma solidity ^0.8.24;
+
 contract ActorAddresses {
     struct EOAActors {
         address DEFAULT_SIGNER;
@@ -26,7 +27,6 @@ contract ActorAddresses {
     mapping(uint256 => Actors) public actors;
 
     constructor() {
-
         Wallets memory holeskyWallets = Wallets({
             YNSecurityCouncil: 0x743b91CDB1C694D4F51bCDA3a4A59DcC0d02b913,
             YNDev: 0x9Dd8F69b62ddFd990241530F47dcEd0Dad7f7d39

@@ -8,7 +8,6 @@ import {Script} from "lib/forge-std/src/Script.sol";
 import {console} from "lib/forge-std/src/console.sol";
 
 contract DeployYieldNestNFT is Script {
-
     YieldNestNFT internal nft;
     YieldNestNFT internal implementation;
     TransparentUpgradeableProxy internal proxy;
@@ -31,7 +30,9 @@ contract DeployYieldNestNFT is Script {
         implementation = new YieldNestNFT();
         proxy = new TransparentUpgradeableProxy(address(implementation), actors.admin.PROXY_ADMIN_OWNER, new bytes(0));
         nft = YieldNestNFT(address(proxy));
-        nft.initialize(actors.admin.ADMIN, actors.admin.MINTER, "YieldNestNFT", "ynNFT", "ipfs://nft.yieldnest.finance/");
+        nft.initialize(
+            actors.admin.ADMIN, actors.admin.MINTER, "YieldNestNFT", "ynNFT", "ipfs://nft.yieldnest.finance/"
+        );
 
         vm.stopBroadcast();
     }

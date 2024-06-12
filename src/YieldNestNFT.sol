@@ -61,7 +61,7 @@ contract YieldNestNFT is
         string calldata tokenName,
         string calldata tokenSymbol,
         string calldata _baseTokenURI
-    ) public initializer {
+    ) external initializer {
         __ERC721_init(tokenName, tokenSymbol);
         __EIP712_init(SIGNING_DOMAIN, SIGNATURE_VERSION);
         __AccessControl_init();
@@ -77,14 +77,14 @@ contract YieldNestNFT is
     //-----------------------------------  MINTING  ----------------------------------------
     //--------------------------------------------------------------------------------------
 
-    function safeMint(address to) public onlyRole(MINTER_ROLE) {
+    function safeMint(address to) external onlyRole(MINTER_ROLE) {
         uint256 tokenId = ++nextTokenId;
         _safeMint(to, tokenId);
 
         emit Minted(to, tokenId);
     }
 
-    function safeMint(MintVoucher calldata voucher, bytes calldata signature) public {
+    function safeMint(MintVoucher calldata voucher, bytes calldata signature) external {
         if (!hasRole(MINTER_ROLE, recoverMintVoucher(voucher, signature))) revert InvalidSignature();
         if (voucher.recipientNonce != _useNonce(voucher.recipient)) revert InvalidNonce();
         if (block.timestamp >= voucher.expiresAt) revert ExpiredVoucher();
@@ -99,7 +99,7 @@ contract YieldNestNFT is
     //-----------------------------------  UPGRADING  --------------------------------------
     //--------------------------------------------------------------------------------------
 
-    function safeUpgrade(UpgradeVoucher calldata voucher, bytes calldata signature) public {
+    function safeUpgrade(UpgradeVoucher calldata voucher, bytes calldata signature) external {
         _requireOwned(voucher.tokenId);
         if (!hasRole(MINTER_ROLE, recoverUpgradeVoucher(voucher, signature))) revert InvalidSignature();
         if (block.timestamp >= voucher.expiresAt) revert ExpiredVoucher();
@@ -115,7 +115,7 @@ contract YieldNestNFT is
     //-------------------------------------  ADMIN  ----------------------------------------
     //--------------------------------------------------------------------------------------
 
-    function setBaseURI(string calldata _baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBaseURI(string calldata _baseTokenURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (keccak256(bytes(_baseTokenURI)) == keccak256(bytes(baseTokenURI))) revert NoChanges();
 
         baseTokenURI = _baseTokenURI;
