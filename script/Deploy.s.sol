@@ -31,7 +31,7 @@ contract DeployYieldNestNFT is Script {
         proxy = new TransparentUpgradeableProxy(address(implementation), actors.admin.PROXY_ADMIN_OWNER, new bytes(0));
         nft = YieldNestNFT(address(proxy));
         nft.initialize(
-            actors.admin.ADMIN, actors.admin.MINTER, "YieldNestNFT", "ynNFT", "ipfs://nft.yieldnest.finance/"
+            actors.admin.ADMIN, actors.admin.MINTER, "YieldNest Pioneer", "ynNFT", "https://assets.yieldnest.finance/pioneer/"
         );
 
         vm.stopBroadcast();

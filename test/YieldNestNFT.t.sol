@@ -253,7 +253,7 @@ contract YieldNestNFTTest is Test {
         }
     }
 
-    function test_enumeratingNoTokensOfAUser() public {
+    function test_enumeratingNoTokensOfAUser() view public {
         // Check if no tokens are correctly enumerated for Bob
         uint256[] memory bobTokens = nft.tokensForOwner(bob);
         assertEq(bobTokens.length, 0, "Bob should have exactly 0 tokens");

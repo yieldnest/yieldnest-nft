@@ -2,11 +2,6 @@
 pragma solidity ^0.8.24;
 
 contract ActorAddresses {
-    struct EOAActors {
-        address DEFAULT_SIGNER;
-        address DEPOSIT_BOOTSTRAPPER;
-    }
-
     struct AdminActors {
         address ADMIN;
         address MINTER;
@@ -15,11 +10,10 @@ contract ActorAddresses {
 
     struct Wallets {
         address YNSecurityCouncil;
-        address YNDev;
+        address Minter;
     }
 
     struct Actors {
-        EOAActors eoa;
         AdminActors admin;
         Wallets wallets;
     }
@@ -29,36 +23,28 @@ contract ActorAddresses {
     constructor() {
         Wallets memory holeskyWallets = Wallets({
             YNSecurityCouncil: 0x743b91CDB1C694D4F51bCDA3a4A59DcC0d02b913,
-            YNDev: 0x9Dd8F69b62ddFd990241530F47dcEd0Dad7f7d39
+            Minter: 0xeF444ABe7cf8fFd94dcBE5e4e1F461C2b4c817E3
         });
 
         actors[17000] = Actors({
-            eoa: EOAActors({
-                DEFAULT_SIGNER: 0x72fdBD51085bDa5eEEd3b55D1a46E2e92f0837a5,
-                DEPOSIT_BOOTSTRAPPER: 0x72fdBD51085bDa5eEEd3b55D1a46E2e92f0837a5
-            }),
             admin: AdminActors({
                 PROXY_ADMIN_OWNER: holeskyWallets.YNSecurityCouncil,
                 ADMIN: holeskyWallets.YNSecurityCouncil,
-                MINTER: holeskyWallets.YNDev
+                MINTER: holeskyWallets.Minter
             }),
             wallets: holeskyWallets
         });
 
         Wallets memory mainnetWallets = Wallets({
             YNSecurityCouncil: 0xfcad670592a3b24869C0b51a6c6FDED4F95D6975,
-            YNDev: 0xa08F39d30dc865CC11a49b6e5cBd27630D6141C3
+            Minter: 0x0927fBD231be6A2d305f566e6D2999449B1f3f85
         });
 
         actors[1] = Actors({
-            eoa: EOAActors({
-                DEFAULT_SIGNER: 0xa1E340bd1e3ea09B3981164BBB4AfeDdF0e7bA0D,
-                DEPOSIT_BOOTSTRAPPER: 0x67a114e733b52CAC50A168F02b5626f500801C62
-            }),
             admin: AdminActors({
-                PROXY_ADMIN_OWNER: holeskyWallets.YNSecurityCouncil,
+                PROXY_ADMIN_OWNER: mainnetWallets.YNSecurityCouncil,
                 ADMIN: mainnetWallets.YNSecurityCouncil,
-                MINTER: mainnetWallets.YNDev
+                MINTER: mainnetWallets.Minter
             }),
             wallets: mainnetWallets
         });
