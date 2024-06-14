@@ -229,6 +229,37 @@ contract YieldNestNFTTest is Test {
         assertEq(nft.stages(1), 1);
     }
 
+
+    function test_enumeratingAllTokensOfAUser() public {
+        // Mint 3 tokens for Bob
+        mintVoucher.recipient = bob;
+        mintVoucher.recipientNonce = 0;
+        mintVoucher.expiresAt = block.timestamp + 1 days;
+        bytes32 digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        mintVoucher.recipientNonce = 1;
+        digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+        mintVoucher.recipientNonce = 2;
+        digest = sigUtils.getTypedDataHash(mintVoucher);
+        mintNft(mintVoucher, digest, minterPrivateKey);
+
+        // Check if all tokens are correctly enumerated for Bob
+        uint256[] memory bobTokens = nft.tokensForOwner(bob);
+        assertEq(bobTokens.length, 3, "Bob should have exactly 3 tokens");
+
+        for (uint256 i = 0; i < bobTokens.length; i++) {
+            assertEq(nft.ownerOf(bobTokens[i]), bob, "Bob should be the owner of the token");
+        }
+    }
+
+    function test_enumeratingNoTokensOfAUser() public {
+        // Check if no tokens are correctly enumerated for Bob
+        uint256[] memory bobTokens = nft.tokensForOwner(bob);
+        assertEq(bobTokens.length, 0, "Bob should have exactly 0 tokens");
+    }
+
+    
     //--------------------------------------------------------------------------------------
     //-----------------------------------  INTERNAL  ---------------------------------------
     //--------------------------------------------------------------------------------------

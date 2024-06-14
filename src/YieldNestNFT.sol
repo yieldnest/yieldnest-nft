@@ -188,6 +188,19 @@ contract YieldNestNFT is
         return _domainSeparatorV4();
     }
 
+    function tokensForOwner(address owner) public view returns (uint256[] memory) {
+        uint256 tokenCount = balanceOf(owner);
+        if (tokenCount == 0) {
+            return new uint256[](0);
+        } else {
+            uint256[] memory tokens = new uint256[](tokenCount);
+            for (uint256 i = 0; i < tokenCount; i++) {
+                tokens[i] = tokenOfOwnerByIndex(owner, i);
+            }
+            return tokens;
+        }
+    }
+
     // The following functions are overrides required by Solidity.
 
     function supportsInterface(bytes4 interfaceId)
